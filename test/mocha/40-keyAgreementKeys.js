@@ -13,17 +13,33 @@ import {_createKeyRecordCipher} from '@bedrock/kms-module-core';
 'u' + Buffer.concat([Buffer.from([0xa2, 0x01]), Buffer.from(crypto.getRandomValues(new Uint8Array(32)))]).toString('base64url')
 */
 /* eslint-enable */
-const keyRecordEncryption = [
+const testParameters = [
   {
-    title: 'w/no wrapping',
-    kek: null
+    title: 'no encryption',
+    encryptConfig: {currentKekId: null},
+    shouldEncrypt: false
   },
   {
-    title: 'w/aes256 wrapping',
-    kek: {
-      id: 'urn:test:aes256',
-      secretKeyMultibase: 'uogH3ERq9FRYOV8IuUiD2gKZs_qN6SLU-6RtbBUfzqQwGdg'
-    }
+    title: 'w/aes256 encryption w/json encoding',
+    encryptConfig: {
+      encoding: 'cbor',
+      keks: [{
+        id: 'urn:test:aes256',
+        secretKeyMultibase: 'uogH3ERq9FRYOV8IuUiD2gKZs_qN6SLU-6RtbBUfzqQwGdg'
+      }]
+    },
+    shouldEncrypt: true
+  },
+  {
+    title: 'w/aes256 encryption w/cbor encoding',
+    encryptConfig: {
+      encoding: 'json',
+      keks: [{
+        id: 'urn:test:aes256',
+        secretKeyMultibase: 'uogH3ERq9FRYOV8IuUiD2gKZs_qN6SLU-6RtbBUfzqQwGdg'
+      }]
+    },
+    shouldEncrypt: true
   }
 ];
 const supportedKeys = [
@@ -38,8 +54,8 @@ const supportedKeys = [
   {type: 'urn:webkms:multikey:ECDH-P-521'}
 ];
 
-for(const encryptConfig of keyRecordEncryption) {
-  describe(`key agreement keys ${encryptConfig.title}`, () => {
+for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
+  describe(`key agreement keys ${title}`, () => {
     const moduleConfig = bedrock.config['ssm-mongodb'];
     const oldConfigValue = moduleConfig.keyRecordEncryption;
     before(async () => {
