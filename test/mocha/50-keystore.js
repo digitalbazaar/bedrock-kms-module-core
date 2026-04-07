@@ -1,14 +1,14 @@
 /*!
- * Copyright (c) 2019-2026 Digital Bazaar, Inc. All rights reserved.
+ * Copyright (c) 2019-2026 Digital Bazaar, Inc.
  */
 import * as bedrock from '@bedrock/core';
-import * as brSSM from '@bedrock/ssm-mongodb';
+import * as brSSM from '@bedrock/kms-module-core';
 import * as database from '@bedrock/mongodb';
 import * as helpers from './helpers.js';
 import {generateId} from 'bnid';
 
 // import is for testing purposes only; not a public export
-import {_createKeyRecordCipher} from '@bedrock/ssm-mongodb';
+import {_createKeyRecordCipher} from '@bedrock/kms-module-core';
 
 /* eslint-disable */
 /*

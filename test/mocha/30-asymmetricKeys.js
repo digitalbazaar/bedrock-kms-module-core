@@ -1,16 +1,16 @@
 /*!
- * Copyright (c) 2019-2026 Digital Bazaar, Inc. All rights reserved.
+ * Copyright (c) 2019-2026 Digital Bazaar, Inc.
  */
 import * as bedrock from '@bedrock/core';
 import * as Bls12381Multikey from '@digitalbazaar/bls12-381-multikey';
-import * as brSSM from '@bedrock/ssm-mongodb';
+import * as brSSM from '@bedrock/kms-module-core';
 import * as cborg from 'cborg';
 import * as EcdsaMultikey from '@digitalbazaar/ecdsa-multikey';
 import * as Ed25519Multikey from '@digitalbazaar/ed25519-multikey';
 import {generateId} from 'bnid';
 
 // import is for testing purposes only; not a public export
-import {_createKeyRecordCipher} from '@bedrock/ssm-mongodb';
+import {_createKeyRecordCipher} from '@bedrock/kms-module-core';
 
 /* eslint-disable */
 /*
