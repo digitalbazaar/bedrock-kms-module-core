@@ -1,16 +1,16 @@
 /*!
  * Copyright (c) 2019-2026 Digital Bazaar, Inc.
  */
-import * as bedrock from '@bedrock/core';
 import * as Bls12381Multikey from '@digitalbazaar/bls12-381-multikey';
-import * as brSSM from '@bedrock/kms-module-core';
 import * as cborg from 'cborg';
+import * as database from '@bedrock/mongodb';
 import * as EcdsaMultikey from '@digitalbazaar/ecdsa-multikey';
 import * as Ed25519Multikey from '@digitalbazaar/ed25519-multikey';
+import * as helpers from './helpers.js';
 import {generateId} from 'bnid';
+import {RecordCipher} from '@bedrock/record-cipher';
 
-// import is for testing purposes only; not a public export
-import {_createKeyRecordCipher} from '@bedrock/kms-module-core';
+const {MOCKS} = helpers;
 
 /* eslint-disable */
 /*
@@ -51,12 +51,14 @@ const supportedKeys = [
     type: 'Ed25519VerificationKey2018',
     expectedContext: 'https://w3id.org/security/suites/ed25519-2018/v1',
     expectedPublicKeyType: 'Ed25519VerificationKey2018',
-    expectedPublicKeyProperty: 'publicKeyBase58'
+    expectedPublicKeyProperty: 'publicKeyBase58',
+    expectedSecretKeyProperty: 'privateKeyBase58'
   },
   {
     type: 'Ed25519VerificationKey2020',
     expectedContext: 'https://w3id.org/security/suites/ed25519-2020/v1',
-    expectedPublicKeyType: 'Ed25519VerificationKey2020'
+    expectedPublicKeyType: 'Ed25519VerificationKey2020',
+    expectedSecretKeyProperty: 'privateKeyMultibase'
   },
   {type: 'urn:webkms:multikey:Ed25519'},
   {type: 'urn:webkms:multikey:P-256'},
@@ -69,14 +71,13 @@ const supportedKeys = [
 
 for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
   describe(`asymmetric keys ${title}`, () => {
-    const moduleConfig = bedrock.config['ssm-mongodb'];
-    const oldConfigValue = moduleConfig.keyRecordEncryption;
+    let kmsModuleApi;
     before(async () => {
-      moduleConfig.keyRecordEncryption = {kek: encryptConfig.kek};
-      await _createKeyRecordCipher();
-    });
-    after(() => {
-      moduleConfig.keyRecordEncryption = oldConfigValue;
+      kmsModuleApi = MOCKS.kmsModuleApi;
+      await helpers.clearCollection({
+        collectionName: MOCKS.storage.collectionName
+      });
+      MOCKS.storage.recordCipher = await RecordCipher.create(encryptConfig);
     });
 
     for(const supportedKey of supportedKeys) {
@@ -85,15 +86,19 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
         // use multikey defaults
         expectedContext = 'https://w3id.org/security/multikey/v1',
         expectedPublicKeyType = 'Multikey',
-        expectedPublicKeyProperty = 'publicKeyMultibase'
+        expectedPublicKeyProperty = 'publicKeyMultibase',
+        expectedSecretKeyProperty = 'secretKeyMultibase'
       } = supportedKey;
       describe(type, () => {
         describe('generateKey API', () => {
           it('generates a key pair', async () => {
+            await helpers.clearCollection({
+              collectionName: MOCKS.storage.collectionName
+            });
             const keyId = `https://example.com/kms/${await generateId()}`;
             const controller = 'https://example.com/i/foo';
             const invocationTarget = {id: keyId, type};
-            const result = await brSSM.generateKey(
+            const result = await kmsModuleApi.generateKey(
               {keyId, controller, operation: {invocationTarget}});
 
             should.exist(result);
@@ -110,6 +115,19 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             keyDescription.id.should.equal(keyId);
             keyDescription.type.should.equal(expectedPublicKeyType);
             keyDescription.controller.should.equal(controller);
+
+            // ensure key record is encrypted per configuration
+            const record = await database.collections[
+              MOCKS.storage.collectionName
+            ].findOne({});
+            record.should.include.keys(['key', 'meta']);
+            if(shouldEncrypt) {
+              record.key.should.include.key('encrypted');
+              record.key.should.not.include.key(expectedSecretKeyProperty);
+            } else {
+              record.key.should.not.include.key('encrypted');
+              record.key.should.include.key(expectedSecretKeyProperty);
+            }
           });
 
           it('generates with a public alias template', async () => {
@@ -120,7 +138,7 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
               publicAliasTemplate:
                 `{+controller}#{${expectedPublicKeyProperty}}`
             };
-            const result = await brSSM.generateKey(
+            const result = await kmsModuleApi.generateKey(
               {keyId, controller, operation: {invocationTarget}});
 
             should.exist(result);
@@ -145,13 +163,13 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             const keyId = `https://example.com/kms/${await generateId()}`;
             const controller = 'https://example.com/i/foo';
             const invocationTarget = {id: keyId, type};
-            await brSSM.generateKey(
+            await kmsModuleApi.generateKey(
               {keyId, controller, operation: {invocationTarget}});
 
             let result;
             let err;
             try {
-              result = await brSSM.generateKey(
+              result = await kmsModuleApi.generateKey(
                 {keyId, controller, operation: {invocationTarget}});
               should.exist(result);
             } catch(e) {
@@ -169,7 +187,7 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             const keyId = `https://example.com/kms/${await generateId()}`;
             const controller = 'https://example.com/i/foo';
             const invocationTarget = {id: keyId, type};
-            const {keyDescription: publicKey} = await brSSM.generateKey(
+            const {keyDescription: publicKey} = await kmsModuleApi.generateKey(
               {keyId, controller, operation: {invocationTarget}});
 
             const plaintextBuffer = Buffer.from(
@@ -184,7 +202,7 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             } else {
               verifyData = Buffer.from(plaintextBuffer).toString('base64url');
             }
-            const result = await brSSM.sign(
+            const result = await kmsModuleApi.sign(
               {keyId, operation: {verifyData}});
 
             should.exist(result);
@@ -240,7 +258,7 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
               type,
               maxCapabilityChainLength: 1
             };
-            await brSSM.generateKey({
+            await kmsModuleApi.generateKey({
               keyId, controller, operation: {invocationTarget}
             });
 
@@ -256,7 +274,7 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
               const verifyData = Buffer
                 .from(globalThis.crypto.randomUUID(), 'utf8')
                 .toString('base64url');
-              result = await brSSM.sign({
+              result = await kmsModuleApi.sign({
                 keyId, operation: {verifyData},
                 zcapInvocation
               });
@@ -277,10 +295,12 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             const keyId = `https://example.com/kms/${await generateId()}`;
             const controller = 'https://example.com/i/foo';
             const invocationTarget = {id: keyId, type};
-            await brSSM.generateKey(
+            await kmsModuleApi.generateKey(
               {keyId, controller, operation: {invocationTarget}});
 
-            const result = await brSSM.getKeyDescription({keyId, controller});
+            const result = await kmsModuleApi.getKeyDescription({
+              keyId, controller
+            });
             result.should.be.an('object');
             result.should.have.keys([
               '@context', 'id', expectedPublicKeyProperty,
@@ -298,14 +318,14 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             const keyId = `https://example.com/kms/${await generateId()}`;
             const controller = 'https://example.com/i/foo';
             const invocationTarget = {id: keyId, type};
-            const result = await brSSM.generateKey(
+            const result = await kmsModuleApi.generateKey(
               {keyId, controller, operation: {invocationTarget}});
             should.exist(result);
 
             let deriveResult;
             let err;
             try {
-              deriveResult = await brSSM.deriveSecret({
+              deriveResult = await kmsModuleApi.deriveSecret({
                 keyId, operation: {publicKey: {type}}
               });
             } catch(e) {
@@ -321,7 +341,7 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             const keyId = `https://example.com/kms/${await generateId()}`;
             const controller = 'https://example.com/i/foo';
             const invocationTarget = {id: keyId, type};
-            const result = await brSSM.generateKey(
+            const result = await kmsModuleApi.generateKey(
               {keyId, controller, operation: {invocationTarget}});
             should.exist(result);
 
@@ -330,7 +350,7 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             try {
               const unwrappedKey =
                 '8vEgpnq8F6QVRmaSYPHTKKZyCXMOgRLiBdZPcfYnIfI';
-              wrapResult = await brSSM.wrapKey({
+              wrapResult = await kmsModuleApi.wrapKey({
                 keyId, operation: {unwrappedKey}
               });
             } catch(e) {
@@ -346,7 +366,7 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             const keyId = `https://example.com/kms/${await generateId()}`;
             const controller = 'https://example.com/i/foo';
             const invocationTarget = {id: keyId, type};
-            await brSSM.generateKey(
+            await kmsModuleApi.generateKey(
               {keyId, controller, operation: {invocationTarget}});
 
             const wrappedKey = '8vEgpnq8F6QVRmaSYPHTKKZyCXMOgRLiBdZPcfYnIfI';
@@ -354,7 +374,9 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
             let result;
             let err;
             try {
-              result = await brSSM.unwrapKey({keyId, operation: {wrappedKey}});
+              result = await kmsModuleApi.unwrapKey({
+                keyId, operation: {wrappedKey}
+              });
             } catch(e) {
               err = e;
             }

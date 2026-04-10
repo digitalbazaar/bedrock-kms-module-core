@@ -1,14 +1,12 @@
 /*!
  * Copyright (c) 2019-2026 Digital Bazaar, Inc.
  */
-import * as bedrock from '@bedrock/core';
-import * as brSSM from '@bedrock/kms-module-core';
 import * as database from '@bedrock/mongodb';
 import * as helpers from './helpers.js';
 import {generateId} from 'bnid';
+import {RecordCipher} from '@bedrock/record-cipher';
 
-// import is for testing purposes only; not a public export
-import {_createKeyRecordCipher} from '@bedrock/kms-module-core';
+const {MOCKS} = helpers;
 
 /* eslint-disable */
 /*
@@ -47,38 +45,47 @@ const testParameters = [
 
 for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
   describe(`keystore ${title}`, () => {
-    const moduleConfig = bedrock.config['ssm-mongodb'];
-    const oldConfigValue = moduleConfig.keyRecordEncryption;
+    let kmsModuleApi;
     before(async () => {
-      moduleConfig.keyRecordEncryption = {kek: encryptConfig.kek};
-      await _createKeyRecordCipher();
-    });
-    after(() => {
-      moduleConfig.keyRecordEncryption = oldConfigValue;
+      kmsModuleApi = MOCKS.kmsModuleApi;
+      await helpers.clearCollection({
+        collectionName: MOCKS.storage.collectionName
+      });
+      MOCKS.storage.recordCipher = await RecordCipher.create(encryptConfig);
     });
 
     describe('getKeyCount API', () => {
       it('gets an accurate key count in a keystore', async () => {
-        // clear existing keys for accurate count unaffected by other tests
-        await database.collections.ssm.deleteMany();
-
         let keystoreId;
         for(let i = 0; i < 3; ++i) {
           const keyId = `https://example.com/kms/${await generateId()}`;
           const controller = 'https://example.com/i/foo';
           const type = 'urn:webkms:multikey:Ed25519';
           const invocationTarget = {id: keyId, type};
-          await brSSM.generateKey(
+          await kmsModuleApi.generateKey(
             {keyId, controller, operation: {invocationTarget}});
           if(!keystoreId) {
             keystoreId = helpers.localId({id: keyId});
           }
         }
 
-        const result = await brSSM.getKeyCount({keystoreId});
+        const result = await kmsModuleApi.getKeyCount({keystoreId});
         result.should.be.an('object');
         result.should.have.property('count');
         result.count.should.equal(3);
+
+        // ensure key record is encrypted per configuration
+        const record = await database.collections[
+          MOCKS.storage.collectionName
+        ].findOne({});
+        record.should.include.keys(['key', 'meta']);
+        if(shouldEncrypt) {
+          record.key.should.include.key('encrypted');
+          record.key.should.not.include.key('secretKeyMultibase');
+        } else {
+          record.key.should.not.include.key('encrypted');
+          record.key.should.include.key('secretKeyMultibase');
+        }
       });
     });
 
@@ -92,7 +99,7 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
         let result;
         let err;
         try {
-          result = await brSSM.generateKey(
+          result = await kmsModuleApi.generateKey(
             {keyId, controller, operation: {invocationTarget}});
         } catch(e) {
           err = e;
