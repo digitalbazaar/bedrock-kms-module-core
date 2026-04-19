@@ -1,6 +1,6 @@
 {
   "name": "@bedrock/kms-module-core",
-  "version": "1.0.1-0",
+  "version": "0.0.1-0",
   "type": "module",
   "description": "Bedrock WebKMS module core",
   "license": "SEE LICENSE IN LICENSE.md",
@@ -37,7 +37,7 @@
     "@bedrock/core": "^6.3.0",
     "@bedrock/kms-module-key-storage": "^1.2.0",
     "@bedrock/mongodb": "^11.0.1",
-    "@bedrock/record-cipher": "^1.1.1"
+    "@bedrock/record-cipher": "^1.2.0"
   },
   "engines": {
     "node": ">=20"
