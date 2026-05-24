@@ -40,8 +40,11 @@
     "@bedrock/mongodb": "^11.0.1",
     "@bedrock/record-cipher": "^1.2.0"
   },
+  "overrides": {
+    "@noble/hashes": "^1.4.0"
+  },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "devDependencies": {
     "eslint": "^8.57.1",
