@@ -7,6 +7,7 @@ import * as database from '@bedrock/mongodb';
 import * as EcdsaMultikey from '@digitalbazaar/ecdsa-multikey';
 import * as Ed25519Multikey from '@digitalbazaar/ed25519-multikey';
 import * as helpers from './helpers.js';
+import * as MldsaMultikey from '@digitalbazaar/mldsa-multikey';
 import {generateId} from 'bnid';
 import {RecordCipher} from '@bedrock/record-cipher';
 
@@ -66,7 +67,10 @@ const supportedKeys = [
   {type: 'urn:webkms:multikey:P-521'},
   {type: 'urn:webkms:multikey:BBS-BLS12-381-SHA-256'},
   {type: 'urn:webkms:multikey:BBS-BLS12-381-SHAKE-256'},
-  {type: 'urn:webkms:multikey:Bls12381G2'}
+  {type: 'urn:webkms:multikey:Bls12381G2'},
+  {type: 'urn:webkms:multikey:ML-DSA-44'},
+  {type: 'urn:webkms:multikey:ML-DSA-65'},
+  {type: 'urn:webkms:multikey:ML-DSA-87'}
 ];
 
 for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
@@ -217,6 +221,9 @@ for(const {title, encryptConfig, shouldEncrypt} of testParameters) {
               verifier = keyPair.verifier();
             } else if(type.startsWith('urn:webkms:multikey:P-')) {
               const keyPair = await EcdsaMultikey.from(publicKey);
+              verifier = keyPair.verifier();
+            } else if(type.startsWith('urn:webkms:multikey:ML-DSA-')) {
+              const keyPair = await MldsaMultikey.from({key: publicKey});
               verifier = keyPair.verifier();
             } else if(type.startsWith('urn:webkms:multikey:BBS-') ||
               type === 'urn:webkms:multikey:Bls12381G2') {
