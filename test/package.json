@@ -16,7 +16,7 @@
     "@bedrock/mongodb": "^11.0.1",
     "@bedrock/record-cipher": "^1.2.0",
     "@bedrock/test": "^8.2.0",
-    "@digitalbazaar/bls12-381-multikey": "^2.1.0",
+    "@digitalbazaar/bls12-381-multikey": "^2.2.0",
     "@digitalbazaar/ecdsa-multikey": "^1.8.0",
     "@digitalbazaar/ed25519-multikey": "^1.3.1",
     "@digitalbazaar/mldsa-multikey": "digitalbazaar/mldsa-multikey#main",
