@@ -1,6 +1,6 @@
 {
   "name": "@bedrock/kms-module-core",
-  "version": "1.1.0",
+  "version": "1.1.1-0",
   "type": "module",
   "description": "Bedrock WebKMS module core",
   "license": "SEE LICENSE IN LICENSE.md",
